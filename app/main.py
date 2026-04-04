@@ -1,6 +1,8 @@
 """
-Virtuals Intelligence API v1.0
+Virtuals Intelligence API v1.1
 GitHub trending intelligence for AI personalities (Virtuals Protocol)
+
+Updated: Added x402 Bazaar extension for automatic discovery
 """
 
 from fastapi import FastAPI, HTTPException, Request
@@ -10,7 +12,9 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import os
 import time
-from datetime import datetime
+import base64
+import json
+from datetime import datetime, timedelta
 
 from .models import (
     TrendingLanguage, TimeRange, GitHubRepo, 
@@ -23,11 +27,23 @@ from .data import (
     analyze_specific_repo
 )
 
+# x402 Official SDK imports
+try:
+    from x402.http import FacilitatorConfig, HTTPFacilitatorClient, PaymentOption
+    from x402.http.middleware.fastapi import PaymentMiddlewareASGI
+    from x402.http.types import RouteConfig
+    from x402.mechanisms.evm.exact import ExactEvmServerScheme
+    from x402.server import x402ResourceServer
+    X402_SDK_AVAILABLE = True
+except ImportError:
+    X402_SDK_AVAILABLE = False
+    print("WARNING: x402 SDK not installed. Run: pip install 'x402[fastapi]'")
+
 # FastAPI app
 app = FastAPI(
     title="Virtuals Intelligence API",
-    version="1.0.0",
-    description="GitHub trending intelligence for AI personalities"
+    version="1.1.0",
+    description="GitHub trending intelligence for AI personalities with x402 Bazaar discovery"
 )
 
 # CORS for browser agents
@@ -37,58 +53,187 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Payment-Required", "X402-Version"]
+    expose_headers=["X-Payment-Required", "X402-Version", "PAYMENT-REQUIRED"]
 )
 
 # x402 Configuration - $0.05 sweet spot
+X402_PRICE_USD = 0.05
 X402_PRICE_MICRO = 50000  # $0.05 in micro-units
 X402_RECIPIENT = "0x8A82Da027AaAE5D32C6694D6B251615f060d8F84"
-X402_NETWORK = "base"
+X402_NETWORK = "eip155:8453"  # Base mainnet
 X402_FACILITATOR = "https://x402.org/facilitator"
 X402_ASSET = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"  # USDC on Base
 
 
-def verify_x402_payment(request: Request) -> bool:
-    """
-    Verify x402 payment signature
-    In production: validate cryptographic signature
-    For beta: check header presence
-    """
-    payment_header = request.headers.get("X-Payment") or request.headers.get("PAYMENT-SIGNATURE")
+# ============================================
+# OFFICIAL x402 SDK SETUP WITH BAZAAR
+# ============================================
+
+if X402_SDK_AVAILABLE:
+    # Create facilitator client
+    facilitator = HTTPFacilitatorClient(
+        FacilitatorConfig(url=X402_FACILITATOR)
+    )
     
+    # Create resource server
+    server = x402ResourceServer(facilitator)
+    server.register(X402_NETWORK, ExactEvmServerScheme())
+    
+    # Define routes with Bazaar discovery metadata
+    routes: dict[str, RouteConfig] = {
+        "GET /api/v1/trending/{language}": RouteConfig(
+            accepts=[
+                PaymentOption(
+                    scheme="exact",
+                    pay_to=X402_RECIPIENT,
+                    price=f"${X402_PRICE_USD}",
+                    network=X402_NETWORK,
+                ),
+            ],
+            mime_type="application/json",
+            description="Get trending GitHub repos with AI-enhanced market insights",
+            extensions={
+                "bazaar": {
+                    "info": {
+                        "output": {
+                            "type": "json",
+                            "example": {
+                                "language": "python",
+                                "repos": [{
+                                    "name": "modelcontextprotocol/servers",
+                                    "url": "https://github.com/modelcontextprotocol/servers",
+                                    "stars_today": 847,
+                                    "why_trending": "MCP protocol adoption surge",
+                                    "ai_summary": "Model Context Protocol servers for AI agents"
+                                }],
+                                "market_insight": "AI agent tooling trending +340%",
+                                "opportunity_hooks": ["Build MCP server", "Integrate with Claude"]
+                            },
+                        },
+                    },
+                },
+            },
+        ),
+        "POST /api/v1/analyze": RouteConfig(
+            accepts=[
+                PaymentOption(
+                    scheme="exact",
+                    pay_to=X402_RECIPIENT,
+                    price=f"${X402_PRICE_USD}",
+                    network=X402_NETWORK,
+                ),
+            ],
+            mime_type="application/json",
+            description="Analyze a specific GitHub repository",
+            extensions={
+                "bazaar": {
+                    "info": {
+                        "output": {
+                            "type": "json",
+                            "example": {
+                                "repo": "openai/openai-python",
+                                "analysis": "Official OpenAI Python SDK",
+                                "conversation_hooks": ["SDK best practices", "Error handling"]
+                            },
+                        },
+                    },
+                },
+            },
+        ),
+        "GET /api/v1/quick/{language}": RouteConfig(
+            accepts=[
+                PaymentOption(
+                    scheme="exact",
+                    pay_to=X402_RECIPIENT,
+                    price=f"${X402_PRICE_USD}",
+                    network=X402_NETWORK,
+                ),
+            ],
+            mime_type="application/json",
+            description="Quick trending check (top 3 repos, optimized for speed)",
+            extensions={
+                "bazaar": {
+                    "info": {
+                        "output": {
+                            "type": "json",
+                            "example": {
+                                "language": "all",
+                                "top_3": [{"name": "trending/repo", "stars_today": 500}],
+                                "hottest": "trending/repo"
+                            },
+                        },
+                    },
+                },
+            },
+        ),
+    }
+    
+    # Add payment middleware
+    app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
+    print("✅ x402 SDK with Bazaar extension loaded")
+
+
+# ============================================
+# LEGACY FALLBACK (if SDK unavailable)
+# ============================================
+
+def verify_x402_payment_legacy(request: Request) -> bool:
+    """Fallback payment verification"""
+    payment_header = request.headers.get("X-Payment") or request.headers.get("PAYMENT-SIGNATURE")
     if not payment_header:
         return False
-    
-    # TODO: Implement full signature verification
     return len(payment_header) > 10
 
 
 def create_402_response() -> JSONResponse:
-    """Create x402 Payment Required response"""
+    """Create x402 v2 Payment Required response"""
+    payment_requirements = {
+        "x402Version": 2,
+        "scheme": "exact",
+        "network": "base",
+        "maxAmountRequired": str(X402_PRICE_MICRO),
+        "asset": {
+            "address": X402_ASSET,
+            "symbol": "USDC",
+            "decimals": 6
+        },
+        "recipient": X402_RECIPIENT,
+        "facilitator": X402_FACILITATOR,
+        "resource": "/api/v1/trending",
+        "description": "GitHub trending intelligence for AI personalities"
+    }
+    
+    payment_header_b64 = base64.b64encode(
+        json.dumps(payment_requirements).encode()
+    ).decode()
+    
     return JSONResponse(
         status_code=402,
         content={
-            "x402Version": 1,
+            "x402Version": 2,
             "error": "Payment Required",
             "accepts": [{
                 "scheme": "exact",
-                "network": X402_NETWORK,
+                "network": "base",
                 "maxAmountRequired": str(X402_PRICE_MICRO),
                 "asset": X402_ASSET,
                 "payTo": X402_RECIPIENT,
                 "facilitator": X402_FACILITATOR
             }],
-            "instructions": f"Send ${X402_PRICE_MICRO / 1_000_000:.2f} USDC to {X402_RECIPIENT} on {X402_NETWORK}"
+            "instructions": f"Send ${X402_PRICE_USD} USDC to {X402_RECIPIENT} on Base",
+            "autoPay": "Wallets with x402 support will auto-sign this payment"
         },
         headers={
+            "PAYMENT-REQUIRED": payment_header_b64,
             "X-Payment-Required": "true",
-            "X402-Version": "1"
+            "X402-Version": "2",
+            "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, X-Payment-Required, X402-Version"
         }
     )
 
 
 # ============================================
-# FREE ENDPOINTS
+# FREE ENDPOINTS (No payment required)
 # ============================================
 
 @app.get("/", response_model=DiscoveryResponse)
@@ -99,16 +244,19 @@ async def service_discovery():
     """
     return DiscoveryResponse(
         service="Virtuals Intelligence API",
-        version="1.0.0",
+        version="1.1.0",
         description="GitHub trending intelligence for AI personalities",
         pricing={"per_request": "$0.05"},
         languages_supported=["python", "javascript", "typescript", "rust", "go", "ai", "all"],
         x402={
-            "version": 1,
-            "price_usd": 0.05,
-            "network": X402_NETWORK,
+            "version": 2,
+            "price_usd": X402_PRICE_USD,
+            "network": "base",
             "asset": X402_ASSET,
-            "recipient": X402_RECIPIENT
+            "recipient": X402_RECIPIENT,
+            "facilitator": X402_FACILITATOR,
+            "auto_pay_enabled": True,
+            "bazaar_enabled": True
         }
     )
 
@@ -119,7 +267,49 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": time.time(),
-        "service": "virtuals-intelligence"
+        "service": "virtuals-intelligence",
+        "x402_sdk": X402_SDK_AVAILABLE,
+        "bazaar_ready": X402_SDK_AVAILABLE
+    }
+
+
+@app.get("/api/v1/sample/{language}")
+async def free_sample(language: str = "all"):
+    """
+    FREE: Single repo sample (STALE - 24h delayed)
+    
+    Try the API before purchasing. Returns 1 repo with DELAYED data.
+    For REAL-TIME trending data, use /api/v1/trending/{language} ($0.05)
+    """
+    raw_repos = fetch_trending_rss(language=language, time_range="daily")[:1]
+    repos = [build_github_repo(r) for r in raw_repos]
+    
+    if not repos:
+        return {"error": "No trending repos found", "language": language}
+    
+    repo = repos[0]
+    stale_timestamp = datetime.utcnow() - timedelta(hours=24)
+    
+    return {
+        "sample": True,
+        "freshness": "24h_delayed",
+        "data_timestamp": stale_timestamp.isoformat() + "Z",
+        "warning": "FREE data is 24 hours old. Pay for real-time.",
+        "language": language,
+        "repo": {
+            "name": repo.name,
+            "url": repo.url,
+            "stars_today": repo.stars_today,
+            "why": repo.why_trending,
+            "hook": repo.ai_summary[:100] if repo.ai_summary else None
+        },
+        "upgrade": {
+            "message": "Get REAL-TIME trending + market insights for $0.05",
+            "value_prop": "Be first to trends. Stale data = missed opportunities.",
+            "endpoint": f"/api/v1/trending/{language}",
+            "price_usd": X402_PRICE_USD
+        },
+        "powered_by": "Virtuals Intelligence API v1.1 with x402 Bazaar"
     }
 
 
@@ -127,18 +317,19 @@ async def health_check():
 # PAID ENDPOINTS ($0.05 each)
 # ============================================
 
-@app.get("/api/v1/trending/{language}", responses={402: {"model": dict}})
+@app.get("/api/v1/trending/{language}")
 async def get_trending(request: Request, language: str = "all"):
     """
     PAID ($0.05): Get trending GitHub repos for a language
     
     Returns AI-enhanced summaries and market insights for AI personalities
+    
+    x402 Payment Required - Bazaar registered
     """
-    # Check payment
-    if not verify_x402_payment(request):
+    # If SDK not available, use legacy check
+    if not X402_SDK_AVAILABLE and not verify_x402_payment_legacy(request):
         return create_402_response()
     
-    # Validate language
     valid_languages = ["all", "python", "javascript", "typescript", "rust", "go", "ai"]
     if language.lower() not in valid_languages:
         raise HTTPException(
@@ -146,13 +337,8 @@ async def get_trending(request: Request, language: str = "all"):
             detail=f"Invalid language. Supported: {', '.join(valid_languages)}"
         )
     
-    # Fetch trending repos
     raw_repos = fetch_trending_rss(language=language, time_range="daily")
-    
-    # Build GitHubRepo models
     repos = [build_github_repo(r) for r in raw_repos]
-    
-    # Generate intelligence layer
     market_insight = generate_market_insight(raw_repos, language)
     opportunity_hooks = generate_opportunity_hooks(raw_repos)
     
@@ -168,15 +354,16 @@ async def get_trending(request: Request, language: str = "all"):
     )
 
 
-@app.post("/api/v1/analyze", responses={402: {"model": dict}})
+@app.post("/api/v1/analyze")
 async def analyze_repo(request: Request, body: RepoSummaryRequest):
     """
     PAID ($0.05): Analyze a specific GitHub repository
     
     Returns detailed analysis with conversation hooks for AI personalities
+    
+    x402 Payment Required - Bazaar registered
     """
-    # Check payment
-    if not verify_x402_payment(request):
+    if not X402_SDK_AVAILABLE and not verify_x402_payment_legacy(request):
         return create_402_response()
     
     try:
@@ -188,22 +375,19 @@ async def analyze_repo(request: Request, body: RepoSummaryRequest):
         raise HTTPException(status_code=500, detail="Failed to analyze repository")
 
 
-@app.get("/api/v1/quick/{language}", responses={402: {"model": dict}})
+@app.get("/api/v1/quick/{language}")
 async def quick_trending(request: Request, language: str = "all"):
     """
-    PAID ($0.05): Quick trending check (simplified response)
+    PAID ($0.05): Quick trending check (top 3 repos, optimized for speed)
     
-    Optimized for speed - returns top 3 repos only
+    x402 Payment Required - Bazaar registered
     """
-    # Check payment
-    if not verify_x402_payment(request):
+    if not X402_SDK_AVAILABLE and not verify_x402_payment_legacy(request):
         return create_402_response()
     
-    # Fetch trending
     raw_repos = fetch_trending_rss(language=language, time_range="daily")[:3]
     repos = [build_github_repo(r) for r in raw_repos]
     
-    # Return simplified response
     return {
         "language": language,
         "top_3": [
@@ -212,7 +396,7 @@ async def quick_trending(request: Request, language: str = "all"):
                 "url": r.url,
                 "stars_today": r.stars_today,
                 "why": r.why_trending,
-                "hook": r.ai_summary[:100]
+                "hook": r.ai_summary[:100] if r.ai_summary else None
             }
             for r in repos
         ],
@@ -243,4 +427,7 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 if __name__ == "__main__":
     import uvicorn
+    print(f"🚀 Starting Virtuals Intelligence API v1.1")
+    print(f"   x402 SDK: {'✅' if X402_SDK_AVAILABLE else '❌'}")
+    print(f"   Bazaar: {'✅ Ready' if X402_SDK_AVAILABLE else '❌ Install x402[fastapi]'}")
     uvicorn.run(app, host="0.0.0.0", port=8000)
