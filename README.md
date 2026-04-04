@@ -1,46 +1,32 @@
-# Virtuals Intelligence API v1.0
+# Virtuals Intelligence API
 
-> **GitHub trending intelligence for AI personalities**
+> GitHub trending intelligence for AI agents
 
-## 🎯 THE MARKET
+## Overview
 
-**Target:** 3,700 AI personalities on Virtuals Protocol
-**Competition:** 2 sellers
-**Ratio:** 1,850:1 (Blue Ocean)
+REST API providing curated GitHub trending data with intelligence layer for AI personality systems.
 
----
+## Pricing
 
-## 💰 PRICING
+**$0.05 per request** via x402 payment protocol.
 
-**$0.05 per request** (x402 sweet spot)
+## Endpoints
 
-| Volume | Revenue | Break-even |
-|--------|---------|------------|
-| 320/month | $16 | Not viable |
-| 3,200/month | $160 | API costs covered |
-| 12,800/month | $640 | Full break-even |
-
-**Market share needed:** 11.5% (427/day of 3,700 buyers)
-
----
-
-## 🚀 ENDPOINTS
-
-### FREE: Service Discovery
+### Service Discovery (Free)
 
 ```bash
 GET /
 ```
 
-Returns API metadata and x402 config.
+Returns API metadata and x402 configuration.
 
 ---
 
-### PAID ($0.05): Trending Repos
+### Trending Repos ($0.05)
 
 ```bash
 GET /api/v1/trending/{language}
-X-Payment: <your-x402-signature>
+X-Payment: <x402-signature>
 ```
 
 **Languages:** `python`, `javascript`, `typescript`, `rust`, `go`, `ai`, `all`
@@ -66,22 +52,22 @@ X-Payment: <your-x402-signature>
 
 ---
 
-### PAID ($0.05): Quick Check
+### Quick Check ($0.05)
 
 ```bash
 GET /api/v1/quick/{language}
-X-Payment: <your-x402-signature>
+X-Payment: <x402-signature>
 ```
 
-Returns top 3 only. Optimized for speed.
+Returns top 3 trending repos. Optimized for low-latency use cases.
 
 ---
 
-### PAID ($0.05): Analyze Specific Repo
+### Analyze Repository ($0.05)
 
 ```bash
 POST /api/v1/analyze
-X-Payment: <your-x402-signature>
+X-Payment: <x402-signature>
 
 {
   "repo_url": "https://github.com/owner/repo"
@@ -103,10 +89,12 @@ X-Payment: <your-x402-signature>
 
 ---
 
-## 💳 x402 PAYMENT FLOW
+## Payment Flow
 
-1. **Request** → API returns `402 Payment Required`
-2. **Response:**
+This API uses the x402 payment protocol:
+
+1. Request endpoint → API returns `402 Payment Required`
+2. Response includes payment details:
    ```json
    {
      "x402Version": 1,
@@ -118,31 +106,29 @@ X-Payment: <your-x402-signature>
      }]
    }
    ```
-3. **Pay** → Send $0.05 USDC on Base
-4. **Retry** → Include signed proof
-5. **Success** → Get intelligence
+3. Send $0.05 USDC on Base network
+4. Retry request with signed payment proof
+5. Receive response
 
 ---
 
-## 🔧 DATA SOURCE
+## Data Source
 
-**GitHub Trending RSS** — Free, no authentication required
+GitHub Trending RSS feeds — no authentication required.
 
 - URL: `https://mshibanami.github.io/GitHubTrendingRSS/daily/{language}.xml`
 - Update frequency: Daily
 - No rate limits
-- No API key needed
 
 ---
 
-## 🚀 QUICK START
+## Quick Start
 
 ```bash
-# Install
+# Install dependencies
 pip install fastapi uvicorn pydantic feedparser requests beautifulsoup4
 
 # Run locally
-cd api_design/virtuals_intelligence_api
 uvicorn app.main:app --reload
 
 # Test free endpoint
@@ -154,39 +140,15 @@ curl http://localhost:8000/api/v1/trending/python
 
 ---
 
-## 📊 BREAK-EVEN MATH
-
-| Metric | Value |
-|--------|-------|
-| Monthly API cost | $160 |
-| Price per request | $0.05 |
-| Requests to break-even | 12,800/month |
-| Daily target | 427 |
-| Market share needed | 11.5% of 3,700 |
-
-**At 12,800 req/month ($640):**
-- 25% → API costs ($160) ✅
-- 25% → Sanctuary Fund ($160)
-- 25% → Animal Charities ($160)
-- 25% → Tania's Land Fund ($160)
-
----
-
-## 🔒 WALLET
-
-**Payment Recipient:** `0x8A82Da027AaAE5D32C6694D6B251615f060d8F84`
-
----
-
-## 📂 STRUCTURE
+## Project Structure
 
 ```
 virtuals_intelligence_api/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py       ← FastAPI + x402
-│   ├── models.py     ← Pydantic
-│   └── data.py       ← GitHub RSS + intelligence
+│   ├── main.py       # FastAPI + x402 middleware
+│   ├── models.py     # Pydantic schemas
+│   └── data.py       # GitHub RSS + intelligence layer
 ├── Dockerfile
 ├── railway.toml
 ├── requirements.txt
@@ -195,36 +157,23 @@ virtuals_intelligence_api/
 
 ---
 
-## ⚠️ BETA STATUS
+## Beta Status
 
-**Current:** v1.0-beta
+**Version:** 1.0-beta
 
-**Limitations:**
-- RSS feed may have delays
-- Mock fallback if RSS fails
+**Current Limitations:**
+- RSS feed may have update delays
+- Mock fallback data if RSS unavailable
 - Payment verification is header-only
 
 **Roadmap:**
-- [ ] Full x402 signature verification
-- [ ] Real-time GitHub API option
-- [ ] More languages
-- [ ] Historical trending data
+- Full x402 signature verification
+- Real-time GitHub API option
+- Additional languages
+- Historical trending data
 
 ---
 
-## 🎯 THE BLUE OCEAN
+## License
 
-| Metric | Value |
-|--------|-------|
-| Buyers/Day | 3,700 |
-| Sellers | 2 |
-| Competition | Almost zero |
-| Sweet spot pricing | ✅ $0.05 |
-
-**This is the water. Flow into it.**
-
----
-
-*Built for THE MISSION & VISION*
-
-**Every request funds the Sanctuary. 🐾**
+MIT

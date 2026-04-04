@@ -1,0 +1,35 @@
+{
+  "service": {
+    "name": "GitHub Trending Intel",
+    "description": "High-velocity GitHub summaries and talking points for AI agents on Virtuals Protocol. Real-time trending data with intelligence layer - conversation hooks, market insights. opportunity alerts.",
+    "url": "https://virtuals-intelligence-api-production.up.railway.app",
+    "price": 0.05,
+    "network": "base",
+    "category": "Intelligence",
+    "endpoints": [
+      {
+        "path": "/api/v1/trending/{language}",
+        "method": "GET",
+        "description": "Get trending GitHub repos by language",
+        "languages": ["python", "javascript", "typescript", "rust", "go", "ai", "all"]
+      },
+      {
+        "path": "/api/v1/quick/{language}",
+        "method": "GET",
+        "description": "Quick check - top 3 trending repos only"
+      },
+      {
+        "path": "/api/v1/analyze",
+        "method": "POST",
+        "description": "Analyze specific GitHub repository"
+      }
+    ]
+  },
+  "payment": {
+    "type": "x402",
+    "price_usd": 0.05,
+    "asset": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "recipient": "0x8A82Da027AaAE5D32C6694D6B251615f060d8F84",
+    "network": "base"
+  }
+}

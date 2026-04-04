@@ -1,7 +1,11 @@
-fastapi==0.109.0
-uvicorn==0.27.0
-pydantic==2.5.3
-python-multipart==0.0.6
-feedparser==6.0.10
-requests==2.31.0
-beautifulsoup4==4.12.3
+"""
+requirements.txt
+
+# x402 SDK requirement (added)
+x402>=02.0
+"""
+
+# Install x402 SDK
+pip install "x402[fastapi]" fastapi>=0.1.0
+psutil>=1.0.0
+git push -u
