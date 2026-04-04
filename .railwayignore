@@ -1,0 +1,4 @@
+# Ignore everything from parent directories
+# Only include the app directory and config files
+
+# This forces Railway to only see the API directory
