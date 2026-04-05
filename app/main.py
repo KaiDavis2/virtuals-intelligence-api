@@ -367,6 +367,87 @@ async def value_error_handler(request: Request, exc: ValueError):
     )
 
 
+# ============================================
+# X Bot Endpoints
+# ============================================
+
+@app.get("/api/v1/bot/status")
+async def bot_status():
+    """Check X bot configuration status"""
+    has_bearer = bool(os.getenv("X_BEARER_TOKEN") or os.getenv("TWITTER_BEARER_TOKEN"))
+    has_consumer = bool(os.getenv("X_CONSUMER_KEY") or os.getenv("TWITTER_CONSUMER_KEY"))
+    has_access = bool(os.getenv("X_ACCESS_TOKEN") or os.getenv("TWITTER_ACCESS_TOKEN"))
+    
+    return {
+        "configured": has_bearer and has_consumer and has_access,
+        "bearer_token": has_bearer,
+        "consumer_key": has_consumer,
+        "access_token": has_access,
+        "ready": has_bearer and has_consumer and has_access
+    }
+
+
+@app.post("/api/v1/bot/test")
+async def bot_test():
+    """Test X bot by posting a trending repo"""
+    try:
+        import tweepy
+    except ImportError:
+        return {"error": "tweepy not installed"}
+    
+    bearer = os.getenv("X_BEARER_TOKEN") or os.getenv("TWITTER_BEARER_TOKEN")
+    consumer_key = os.getenv("X_CONSUMER_KEY") or os.getenv("TWITTER_CONSUMER_KEY")
+    consumer_secret = os.getenv("X_CONSUMER_SECRET") or os.getenv("TWITTER_CONSUMER_SECRET")
+    access_token = os.getenv("X_ACCESS_TOKEN") or os.getenv("TWITTER_ACCESS_TOKEN")
+    access_secret = os.getenv("X_ACCESS_TOKEN_SECRET") or os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
+    
+    if not all([bearer, consumer_key, consumer_secret, access_token, access_secret]):
+        return {"error": "X credentials incomplete", "ready": False}
+    
+    try:
+        client = tweepy.Client(
+            bearer_token=bearer,
+            consumer_key=consumer_key,
+            consumer_secret=consumer_secret,
+            access_token=access_token,
+            access_token_secret=access_secret
+        )
+        
+        # Get a trending repo
+        repos = fetch_trending_rss(language="python", time_range="daily")
+        if not repos:
+            return {"error": "No trending repos", "ready": True}
+        
+        repo = repos[0]
+        name = repo.get("name", "repo")
+        url = repo.get("url", "")
+        stars = repo.get("stars_today", 0)
+        
+        # Build tweet
+        tweet = f"Testing Virtuals Intelligence API\n\nTop trending: {name}\n+{stars} stars today\n\n{url}\n\n#AI #GitHub"
+        
+        if len(tweet) > 280:
+            tweet = tweet[:277] + "..."
+        
+        # Post tweet
+        response = client.create_tweet(text=tweet)
+        
+        if response.data:
+            tweet_id = response.data["id"]
+            return {
+                "success": True,
+                "tweet_id": tweet_id,
+                "tweet_url": f"https://x.com/VirtualsIntel/status/{tweet_id}",
+                "repo": name,
+                "ready": True
+            }
+        else:
+            return {"error": "No response from X API", "ready": True}
+            
+    except Exception as e:
+        return {"error": str(e), "ready": True}
+
+
 if __name__ == "__main__":
     import uvicorn
     print("=" * 60)
