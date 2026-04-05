@@ -1,11 +1,11 @@
-"""
-requirements.txt
-
-# x402 SDK requirement (added)
+# Core dependencies
 x402>=02.0
-"""
-
-# Install x402 SDK
-pip install "x402[fastapi]" fastapi>=0.1.0
+fastapi>=1.1.0
 psutil>=1.0.0
-git push -u
+httpx>=0.0.0
+
+# X Bot dependencies
+tweepy>=4.14.0
+
+# Data processing
+feedparser>=6.0.1
