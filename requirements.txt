@@ -1,6 +1,6 @@
 # Core dependencies
-x402>=02.0
-fastapi>=1.1.0
+x402>=0.2.0
+fastapi>=0.100.0
 psutil>=1.0.0
 httpx>=0.0.0
 
