@@ -9,9 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application
 COPY app/ ./app/
 
-# Expose port
-EXPOSE 8000
+# Expose port (use Railway's PORT variable)
+EXPOSE ${PORT:-8000}
 
-# Run
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-# Cache bust: 1775389838
+# Run - use PORT env var from Railway
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

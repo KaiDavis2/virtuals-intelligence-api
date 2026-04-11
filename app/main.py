@@ -60,7 +60,7 @@ X402_ASSET = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
 # FastAPI app
 app = FastAPI(
     title="Virtuals Intelligence API",
-    version="1.2.0-hardened",
+    version="1.2.1-clean",
     description="GitHub trending intelligence — x402 SDK hardened"
 )
 
@@ -202,7 +202,7 @@ async def service_discovery():
     """FREE: Service discovery"""
     return DiscoveryResponse(
         service="Virtuals Intelligence API",
-        version="1.2.0-hardened",
+        version="1.2.1-clean",
         description="GitHub trending intelligence — x402 SDK hardened",
         pricing={"per_request": "$0.05"},
         languages_supported=["python", "javascript", "typescript", "rust", "go", "ai", "all"],
@@ -227,7 +227,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": time.time(),
         "service": "virtuals-intelligence",
-        "version": "1.2.0-hardened",
+        "version": "1.2.1-clean",
         "x402_sdk": X402_SDK_AVAILABLE,
         "bazaar_ready": X402_SDK_AVAILABLE
     }
@@ -345,6 +345,40 @@ async def quick_trending(request: Request, language: str = "all"):
         "hottest": repos[0].name if repos else None,
         "total_stars_today": sum(r.stars_today or 0 for r in repos)
     }
+
+
+# ============================================
+# BOT NOISE HANDLERS (kill 404 spam)
+# ============================================
+
+BOT_PATHS = {
+    "/robots.txt": "User-agent: *\nAllow: /\nDisallow: /api/v1/bot/\n",
+    "/favicon.ico": "",
+    "/sitemap.xml": '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n</urlset>',
+}
+
+@app.get("/robots.txt")
+async def robots_txt():
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(BOT_PATHS["/robots.txt"])
+
+@app.get("/favicon.ico")
+async def favicon():
+    return JSONResponse(status_code=204, content=None)
+
+@app.get("/sitemap.xml")
+async def sitemap():
+    from fastapi.responses import Response
+    return Response(content=BOT_PATHS["/sitemap.xml"], media_type="application/xml")
+
+# Catch-all for unknown paths — return clean JSON instead of default 404
+@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
+async def catch_all(request: Request, path: str):
+    # Known bot scan patterns — silent reject
+    scanner_patterns = ["wp-", ".env", "admin", "php", "wordpress", "config", "backup", ".git"]
+    if any(p in path.lower() for p in scanner_patterns):
+        return JSONResponse(status_code=404, content={"error": "Not found", "code": "NOT_FOUND"})
+    return JSONResponse(status_code=404, content={"error": "Not found", "code": "NOT_FOUND", "hint": "See / for service discovery"})
 
 
 # ============================================
